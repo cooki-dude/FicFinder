@@ -1,4 +1,5 @@
 from bs4 import element
+from warnings import warn
 
 class Fanfic:
     title:str
@@ -8,13 +9,33 @@ class Fanfic:
     chapters:str
 
     symbols:list[str]
-    tags:list[str]
+
+    warnings:list[str]
+    relationships:list[str]
+    characters:list[str]
+    freeforms:list[str]
+    fandom:list[str]
 
     words: int
     kudos:int
 
+    exists = True
+
+    def __str__(self):
+        out = ""
+        out += f"title: {self.title}\n"
+        out += f"author: {self.author} {self.authorURL}\n"
+        out += f"chapters: {self.chapters}\n"
+        out += f"symbols: {self.symbols}\n"
+        out += f"tags: {self.tags}\n"
+        out += f"{self.kudos} kudos, {self.words} words\n"
+        out += self.summary
+        return out
+
     def __init__(self, ff:element.Tag):
         if not ff.find(class_="works") == None:
+            warn("This is a Series, not a Work. Exists = False")
+            self.exists = False
             return
 
         #title, author, authorURL
@@ -32,22 +53,38 @@ class Fanfic:
             self.symbols.append(i)
 
         #tags
-        self.tags = []
-        tags_raw = ff.find("ul", "tags").stripped_strings
+        self.warnings = []
+        self.relationships = []
+        self.characters = []
+        self.freeforms = []
+        tags_raw = ff.find("ul", "tags")
         for i in tags_raw:
-            self.tags.append(i)
+            if i == '\n':
+                continue
+            match i['class'][0]:
+
+                case 'warnings':
+                    self.warnings.append(next(i.stripped_strings))
+                case 'relationships':
+                    self.relationships.append(next(i.stripped_strings))
+                case 'characters':
+                    self.characters.append(next(i.stripped_strings))
+                case 'freeforms':
+                    self.freeforms.append(next(i.stripped_strings))
 
         #fandom (more tags)
+        self.fandom = []
         fandom_raw = ff.find("h5", class_="fandoms").find_all("a")
         for tag in fandom_raw:
-            self.tags.append(tag.string)
+            self.fandom.append(tag.string)
 
 
         #summary
         summary_raw = ff.find(class_="userstuff summary").stripped_strings
+        self.summary = ""
         for i in summary_raw:
             if not i == "\n":
-                self.summary = i
+                self.summary += i + "\n"
 
         #word count
         self.words = int("".join(ff.find("dd", "words").string.split(",")))
@@ -69,8 +106,14 @@ class Fanfic:
         out += f"kudos: {self.kudos}\n\n"
 
         out += f"symbols: {self.symbols}\n"
-        out += f"tags: {self.tags}\n"
+        out += f"warnings: {self.warnings}\n"
+        out += f"relationships: {self.relationships}\n"
+        out += f"characters: {self.characters}\n"
+        out += f"freeforms: {self.freeforms}\n"
+
         out += f"summary: {self.summary}\n"
 
         return out
 
+    def tags(self):
+        return self.relationships + self.characters + self.freeforms
